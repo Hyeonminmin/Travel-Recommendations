@@ -3,8 +3,16 @@ import type { EventProvider, TripQuery } from "./types.js";
 
 type Fetch = typeof fetch;
 
-/** TourAPI areaCode (시도). 도착지 id → 코드. 필요한 도시는 여기에 추가. */
-const AREA_CODE: Record<string, string> = { jeju: "39", busan: "6", gangneung: "32", yeosu: "38" };
+/**
+ * 도착지 id → 시도 코드. 필요한 도시는 여기에 추가.
+ *  - KorService2: lDongRegnCd(법정동 시도코드, 실응답 확인) / KorService1: areaCode(구 코드)
+ */
+const REGION: Record<string, { ldong: string; area: string }> = {
+  jeju: { ldong: "50", area: "39" },
+  busan: { ldong: "26", area: "6" },
+  gangneung: { ldong: "51", area: "32" },
+  yeosu: { ldong: "46", area: "38" },
+};
 
 const ymdToIso = (s: string) => `${s.slice(0, 4)}-${s.slice(4, 6)}-${s.slice(6, 8)}`;
 const isoToYmd = (s: string) => s.replace(/-/g, "");
@@ -27,20 +35,25 @@ export function extractItems(j: any): FestivalItem[] {
 /**
  * 한국관광공사 TourAPI 행사정보(searchFestival). 국내 도착지만 실제 호출하고
  * 해외·실패 시에는 fallback(Mock) 사용. 서비스 버전은 KorService2 → KorService1 순으로 시도.
- * ※ 실제 응답으로 필드 구조를 검증하지 못했음(verify:apis 로 확인 필요).
+ * KorService2 응답 필드(title/addr1/eventstartdate/eventenddate)는 실응답으로 확인함.
  */
 export function createTourApiEvents(serviceKey: string, fallback: EventProvider, fetchFn: Fetch = fetch): EventProvider {
   const key = normalizeServiceKey(serviceKey);
 
-  async function load(areaCode: string, q: TripQuery): Promise<FestivalItem[]> {
+  async function load(region: { ldong: string; area: string }, q: TripQuery): Promise<FestivalItem[]> {
     let lastErr: unknown;
     for (const [svc, op] of [["KorService2", "searchFestival2"], ["KorService1", "searchFestival1"]] as const) {
       try {
         const params = new URLSearchParams({
           serviceKey: key, MobileOS: "ETC", MobileApp: "TravelRec", _type: "json",
-          eventStartDate: isoToYmd(q.startDate), areaCode, numOfRows: "100", pageNo: "1",
+          eventStartDate: isoToYmd(q.startDate), numOfRows: "100", pageNo: "1",
         });
-        const res = await fetchFn(`https://apis.data.go.kr/B551011/${svc}/${op}?${params}`);
+        if (svc === "KorService2") params.set("lDongRegnCd", region.ldong); else params.set("areaCode", region.area);
+        const url = `https://apis.data.go.kr/B551011/${svc}/${op}?${params}`;
+        // 서버가 간헐적으로 연결을 끊는 것이 관찰되어(실측) 서비스당 최대 3회 재시도
+        let res: Response | undefined;
+        for (let i = 0; i < 3 && !res; i++) { try { res = await fetchFn(url); } catch (e) { lastErr = e; } }
+        if (!res) throw lastErr;
         if (!res.ok) throw new Error(`tourapi HTTP ${res.status}`);
         const j = JSON.parse(await res.text());
         if (j?.response?.header?.resultCode && j.response.header.resultCode !== "0000") {
@@ -54,7 +67,7 @@ export function createTourApiEvents(serviceKey: string, fallback: EventProvider,
 
   return {
     async events(dest: Destination, q: TripQuery): Promise<Sourced<TripEvent[]>> {
-      const area = dest.domestic ? AREA_CODE[dest.id] : undefined;
+      const area = dest.domestic ? REGION[dest.id] : undefined;
       if (!area) return fallback.events(dest, q);
       try {
         const items = await load(area, q);

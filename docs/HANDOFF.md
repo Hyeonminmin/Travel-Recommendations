@@ -16,10 +16,12 @@
 키 값은 채팅에 붙여넣지 않는다. 값을 출력/로그/커밋하지 않는다.
 
 ## 이번 세션 결과
-- 환경변수 두 키는 읽힘. 그러나 환경 네트워크 허용 목록이 비어 있어 Open-Meteo / apis.data.go.kr / dapi.kakao.com 이 403(프록시 차단)이라 실제 호출 검증 불가.
-  (update_environment 승인 요청을 사용자가 모바일이라 허용하지 못함. 허용할 호스트: api.open-meteo.com, archive-api.open-meteo.com, apis.data.go.kr, dapi.kakao.com)
-- TourAPI 행사 Provider 구현(src/providers/tourApi.ts, 가짜 fetch 테스트 통과). **실제 응답 구조는 미검증** — 호스트 허용 후 verify:apis 로 확인.
-  국내 도착지만 호출, 실패/해외는 Mock fallback. DATA_GO_KR_SERVICE_KEY 가 있으면 자동 활성화.
+- 사용자가 환경 Allowed domains 에 4개 호스트 추가 완료 → 실호출 가능. verify:apis: Travelpayouts/TourAPI/기상청/Kakao OK, 특일은 curl 로 정상(Node 1회 fetch failed, 일시적),
+  Open-Meteo 는 공용 IP 일일한도 429(우리 코드 문제 아님, 시간이 지나면 해소).
+- TourAPI 행사 Provider 실응답으로 확정(src/providers/tourApi.ts):
+  KorService2 는 `areacode` 가 비어 있고 `lDongRegnCd`(법정동 시도코드: 제주50 부산26 강원51 전남46)로 필터. 서버가 간헐적으로 연결을 끊어 3회 재시도.
+  행사 기간 겹침 + addr1 에 도시명 포함으로 필터. 상세 API GET /destination/:id 완료.
+- 특일 응답: `response.body.items.item` 이 1건이면 객체, 여러 건이면 배열, `locdate`(숫자 YYYYMMDD), `isHoliday`("Y"), `dateName`.
 
 ## 다음 작업 (1번은 완료: 단, 네트워크 허용 후 재실행 필요)
 1. `cd backend && npm install && npm run verify:apis` 를 NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt 와 함께 실행해 OK/FAIL 확인
