@@ -29,6 +29,11 @@
 - 기상청 단기예보 Provider(kma.ts, 실응답 확인): 위경도→격자 변환(서울 60,127 검증), 발표 시각 계산(KST, 10분 지연). 발표 시점 기준 약 5일치만 제공 →
   여행 일수의 절반 이상을 덮을 때만 사용, 아니면 fallback(Open-Meteo 평년값 → Mock). 중기예보(4~10일)는 지역코드 체계가 달라 미구현.
 
+- 날씨 합성(kma.ts + kmaMid.ts): 단기예보(~5일) → 못 덮은 날은 중기예보(4~10일) → 그래도 못 덮은 날은 fallback(과거 3년 평년값)을 **덮인 일수 비율로 가중 평균**. 출처 문자열에 `단기N일+중기M일/전체일 + 나머지 …` 표기.
+- ⚠ 중기예보(MidFcstInfoService)·ASOS(AsosDalyInfoService)는 현재 키가 `SERVICE_KEY_IS_NOT_REGISTERED` → data.go.kr 에서
+  `기상청_중기예보 조회서비스` 활용신청 필요(승인 후 수 분~1시간). 중기 지역코드/필드는 공식 문서 기준이며 **실응답 미검증**(kmaMid.ts MID_REGION). 승인 전에는 자동으로 건너뜀.
+- 과거 날씨는 Open-Meteo archive(최근 3년 같은 기간)로 이미 반영. 오늘 공용 IP 일일한도(429)라 실검증 못함 → 한도 해소 후 확인. 대안: 기상청 ASOS 일자료(활용신청 필요).
+
 ## 다음 작업 (1번은 완료: 단, 네트워크 허용 후 재실행 필요)
 1. `cd backend && npm install && npm run verify:apis` 를 NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt 와 함께 실행해 OK/FAIL 확인
    - TourAPI 서비스 버전(KorService2/1)과 필드 구조는 실제 응답으로 확정할 것
