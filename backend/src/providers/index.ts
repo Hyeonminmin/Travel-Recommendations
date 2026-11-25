@@ -1,5 +1,6 @@
 import { createMockProviders } from "./mock.js";
 import { createOpenMeteoWeather } from "./openMeteo.js";
+import { createAsosClimatology } from "./asos.js";
 import { createKmaWeather } from "./kma.js";
 import { createKakaoPlaces } from "./kakaoPlaces.js";
 import { createSpecialDayHolidays } from "./holidays.js";
@@ -23,8 +24,10 @@ export function createProviders(env: NodeJS.ProcessEnv = process.env): { provide
   if (env.DATA_GO_KR_SERVICE_KEY) {
     providers.event = createTourApiEvents(env.DATA_GO_KR_SERVICE_KEY, mock.event);
     live.push("event(TourAPI, 국내만)");
+    // 과거 평년값: ASOS(국내) → Open-Meteo/Mock. 예보가 덮는 날은 기상청 예보가 우선.
+    providers.weather = createAsosClimatology(env.DATA_GO_KR_SERVICE_KEY, providers.weather);
     providers.weather = createKmaWeather(env.DATA_GO_KR_SERVICE_KEY, providers.weather);
-    live.push("weather(기상청 단기예보, 국내 근접일)");
+    live.push("weather(기상청 단기·중기예보 + ASOS 평년값, 국내)");
     providers.holiday = createSpecialDayHolidays(env.DATA_GO_KR_SERVICE_KEY, mock.holiday);
     live.push("holiday(특일)");
   }
