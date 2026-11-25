@@ -25,6 +25,6 @@
 1. `cd backend && npm install && npm run verify:apis` 를 NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt 와 함께 실행해 OK/FAIL 확인
    - TourAPI 서비스 버전(KorService2/1)과 필드 구조는 실제 응답으로 확정할 것
 2. (TourAPI 행사 완료) 기상청 단기예보(국내 15일 이내), 특일(공휴일 혼잡 패널티) 구현
-3. Kakao 로컬 기반 식당/볼거리 Provider 추가, 결과 상세 API(/destination/{id})
+3. Kakao 로컬 기반 식당/볼거리 Provider 추가 (결과 상세 API GET /destination/:id 는 완료)
 4. 숙소 가격 소스 검토(Travelpayouts Hotellook 가능 여부)
 5. 각 Provider 는 실패 시 Mock fallback 유지, 단위 테스트(가짜 fetch) 추가
