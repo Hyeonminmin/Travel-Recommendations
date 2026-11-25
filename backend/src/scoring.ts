@@ -53,6 +53,11 @@ export function logisticsScore(flightHours: number): number {
   return clamp01(1 - flightHours / 12);
 }
 
+/** 여행 기간 내 공휴일 1일당 0.1, 최대 0.3 감점 (공항·관광지 혼잡 근거) */
+export function congestionPenalty(holidayCount: number): number {
+  return Math.min(0.3, 0.1 * holidayCount);
+}
+
 function links(dest: Destination, req: RecommendRequest) {
   const q = encodeURIComponent;
   const out = [
@@ -88,12 +93,13 @@ export async function recommend(
 
   await Promise.all(
     candidates.map(async (dest) => {
-      const [flight, night, rating, weather, events] = await Promise.all([
+      const [flight, night, rating, weather, events, holidays] = await Promise.all([
         providers.flight.roundTripPerPersonKRW(dest, q),
         providers.lodging.perNightKRW(dest, q),
         providers.lodging.rating(dest),
         providers.weather.forecast(dest, q),
         providers.event.events(dest, q),
+        providers.holiday.holidays(q),
       ]);
 
       const total = flight.value * req.travelers + night.value * nights * rooms + dest.dailySpendKRW * req.travelers * nights;
@@ -114,13 +120,16 @@ export async function recommend(
         },
         lodging: { score: lodgingScore(rating.value), reason: `숙소 평점 ${rating.value.toFixed(1)}/5` },
         poi: { score: poiScore(dest, req.tags), reason: `취향 태그 일치: ${dest.tags.filter((t) => req.tags.includes(t)).join(", ") || "없음"}` },
-        logistics: { score: logisticsScore(dest.flightHours), reason: `이동 약 ${dest.flightHours}시간` },
+        logistics: {
+          score: clamp01(logisticsScore(dest.flightHours) - congestionPenalty(holidays.value.length)),
+          reason: `이동 약 ${dest.flightHours}시간` + (holidays.value.length ? `, 기간 내 공휴일 ${holidays.value.map((h) => h.name).join("/")}로 혼잡 예상` : ""),
+        },
       };
 
       const breakdown: FactorResult[] = WEIGHT_KEYS.map((k) => ({ factor: k, score: raw[k].score, weight: weights[k], reason: raw[k].reason }));
       const totalScore = Math.round(breakdown.reduce((a, b) => a + b.score * b.weight, 0) * 1000) / 10;
 
-      const estimated = [flight, night, rating, weather, events].some((s) => s.estimated);
+      const estimated = [flight, night, rating, weather, events, holidays].some((s) => s.estimated);
       results.push({
         destinationId: dest.id,
         name: dest.name,

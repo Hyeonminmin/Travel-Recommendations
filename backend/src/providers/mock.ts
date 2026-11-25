@@ -3,6 +3,8 @@ import type { Providers } from "./types.js";
 
 const now = () => new Date().toISOString();
 const SRC = "mock-sample";
+/** 샘플: 연말연시 공휴일만 (실제 값은 특일 API 사용). */
+const MOCK_HOLIDAYS = [{ date: "2026-12-25", name: "기독탄신일" }, { date: "2027-01-01", name: "신정" }];
 
 /** API 키가 없을 때 쓰는 결정적(deterministic) 샘플 Provider. 값은 모두 추정치. */
 export function createMockProviders(): Providers {
@@ -32,6 +34,12 @@ export function createMockProviders(): Providers {
     event: {
       async events(dest, q) {
         return { value: eventsFor(dest.id, q.startDate, q.endDate), source: SRC, asOf: now(), estimated: true };
+      },
+    },
+    holiday: {
+      async holidays(q) {
+        const value = MOCK_HOLIDAYS.filter((h) => h.date >= q.startDate && h.date <= q.endDate);
+        return { value, source: `${SRC}(공휴일 일부)`, asOf: now(), estimated: true };
       },
     },
   };

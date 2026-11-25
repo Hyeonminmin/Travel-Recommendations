@@ -21,9 +21,14 @@ export interface WeatherProvider {
 export interface EventProvider {
   events(dest: Destination, q: TripQuery): Promise<Sourced<TripEvent[]>>;
 }
+export interface HolidayProvider {
+  /** 여행 기간 내 공휴일 (혼잡도 근거) */
+  holidays(q: TripQuery): Promise<Sourced<{ date: string; name: string }[]>>;
+}
 export interface Providers {
   flight: FlightProvider;
   lodging: LodgingProvider;
   weather: WeatherProvider;
   event: EventProvider;
+  holiday: HolidayProvider;
 }
