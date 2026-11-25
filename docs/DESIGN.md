@@ -20,9 +20,9 @@
 
 | 영역 | 해외 | 국내 |
 |---|---|---|
-| 항공 가격 | Travelpayouts Data API(캐시 최저가, 도착지 미지정 탐색 가능) 1순위, Amadeus Self-Service 보조 | 공개 가격 API 없음 → 노선별 대략가 + 딥링크(네이버항공/각 항공사) |
+| 항공 가격 | Travelpayouts Data API(캐시 최저가) 단일 소스 (※ Amadeus Self-Service는 2026-07 종료되어 제외) | 공개 가격 API 없음 → 노선별 대략가 + 딥링크(네이버항공/각 항공사) |
 | 교통(국내) | - | KTX/SRT/버스는 정액에 가까움 → 정적 요금표 + 딥링크 |
-| 숙소 가격 | Travelpayouts(Hotellook) 캐시 가격, Amadeus Hotel 보조 | TourAPI 숙박 정보(가격 없음) + 가격대 추정 + 딥링크(야놀자/여기어때/네이버) |
+| 숙소 가격 | Travelpayouts(Hotellook) 캐시 가격 (제공 범위 Phase 0에서 검증, 불가 시 가격대 추정 + 딥링크) | TourAPI 숙박 정보(가격 없음) + 가격대 추정 + 딥링크(야놀자/여기어때/네이버) |
 | 숙소 컨디션 | 리뷰 요약(LLM) — 확보 가능한 리뷰 범위 내 | 동일 (Naver/Kakao 장소 평점, 리뷰 텍스트는 제한적) |
 | 날씨 | Open-Meteo (예보 + 과거 기후 통계) | 기상청 단기/중기예보 (공공데이터포털) + Open-Meteo 기후통계 |
 | 축제/이벤트 | PredictHQ 또는 공휴일/이벤트 캘린더 | 한국관광공사 TourAPI 행사정보, 특일정보(공휴일) API |
@@ -76,5 +76,6 @@ factor:
 | API 키 노출 | 서버 보관, 앱엔 자체 API 토큰만 |
 
 ## 7. 다음 작업
-1. Phase 0: 각 API 키 발급 및 검증 (사용자 작업 필요: 계정 가입/키 발급)
-2. Android 프로젝트 스캐폴딩 + 백엔드 스켈레톤 + `/recommend` 목업
+1. Phase 0: `docs/API_KEYS.md` 따라 키 발급 → `npm run verify:apis` 로 검증
+2. 완료: 백엔드 스켈레톤 + 점수 엔진 + `/recommend`(Mock Provider) + Android 스캐폴딩
+3. 다음: 검증된 API 순서대로 실제 Provider 구현(Open-Meteo → TourAPI/기상청 → Travelpayouts → Kakao)
