@@ -42,5 +42,10 @@ export function createMockProviders(): Providers {
         return { value, source: `${SRC}(공휴일 일부)`, asOf: now(), estimated: true };
       },
     },
+    place: {
+      async places() {
+        return { value: { restaurants: [], attractions: [] }, source: `${SRC}(장소 데이터 없음)`, asOf: now(), estimated: true };
+      },
+    },
   };
 }

@@ -25,10 +25,15 @@ export interface HolidayProvider {
   /** 여행 기간 내 공휴일 (혼잡도 근거) */
   holidays(q: TripQuery): Promise<Sourced<{ date: string; name: string }[]>>;
 }
+export interface Place { name: string; category: string; address: string; url: string; lat?: number; lon?: number }
+export interface PlaceProvider {
+  places(dest: Destination): Promise<Sourced<{ restaurants: Place[]; attractions: Place[] }>>;
+}
 export interface Providers {
   flight: FlightProvider;
   lodging: LodgingProvider;
   weather: WeatherProvider;
   event: EventProvider;
   holiday: HolidayProvider;
+  place: PlaceProvider;
 }

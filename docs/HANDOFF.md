@@ -23,10 +23,13 @@
   행사 기간 겹침 + addr1 에 도시명 포함으로 필터. 상세 API GET /destination/:id 완료.
 - 특일 응답: `response.body.items.item` 이 1건이면 객체, 여러 건이면 배열, `locdate`(숫자 YYYYMMDD), `isHoliday`("Y"), `dateName`.
 
+- 특일 Provider(holidays.ts, 실응답 확인): 기간 내 공휴일 1일당 logistics 점수 -0.1(최대 -0.3). 설날 연휴·대체공휴일 정상 수신.
+- Kakao 장소 Provider(kakaoPlaces.ts, 실응답 확인): 국내 음식점(FD6)/관광명소(AT4) 정확도순. 상세 API(/destination/:id)의 places 로 노출. 점수에는 미반영(poiDensity 샘플값 그대로).
+
 ## 다음 작업 (1번은 완료: 단, 네트워크 허용 후 재실행 필요)
 1. `cd backend && npm install && npm run verify:apis` 를 NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt 와 함께 실행해 OK/FAIL 확인
    - TourAPI 서비스 버전(KorService2/1)과 필드 구조는 실제 응답으로 확정할 것
-2. (TourAPI 행사 완료) 기상청 단기예보(국내 15일 이내), 특일(공휴일 혼잡 패널티) 구현
-3. Kakao 로컬 기반 식당/볼거리 Provider 추가 (결과 상세 API GET /destination/:id 는 완료)
+2. (TourAPI 행사/특일 완료) 기상청 단기예보(국내 15일 이내, 위경도→격자 변환 필요) 구현
+3. (Kakao 장소·상세 API 완료) poiDensity 를 Kakao 결과 수 등 실데이터로 대체할지 검토, Android 상세 화면 연동
 4. 숙소 가격 소스 검토(Travelpayouts Hotellook 가능 여부)
 5. 각 Provider 는 실패 시 Mock fallback 유지, 단위 테스트(가짜 fetch) 추가

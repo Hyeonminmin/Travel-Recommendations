@@ -1,5 +1,6 @@
 import { createMockProviders } from "./mock.js";
 import { createOpenMeteoWeather } from "./openMeteo.js";
+import { createKakaoPlaces } from "./kakaoPlaces.js";
 import { createSpecialDayHolidays } from "./holidays.js";
 import { createTourApiEvents } from "./tourApi.js";
 import { createTravelpayoutsFlight } from "./travelpayouts.js";
@@ -23,6 +24,10 @@ export function createProviders(env: NodeJS.ProcessEnv = process.env): { provide
     live.push("event(TourAPI, 국내만)");
     providers.holiday = createSpecialDayHolidays(env.DATA_GO_KR_SERVICE_KEY, mock.holiday);
     live.push("holiday(특일)");
+  }
+  if (env.KAKAO_REST_API_KEY) {
+    providers.place = createKakaoPlaces(env.KAKAO_REST_API_KEY, mock.place);
+    live.push("place(Kakao, 국내만)");
   }
   return { providers, live };
 }
