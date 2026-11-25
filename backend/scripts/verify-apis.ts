@@ -43,11 +43,11 @@ await check("Open-Meteo (키 불필요)", true, async () => {
 });
 
 await check("Travelpayouts 항공 캐시가", !!env("TRAVELPAYOUTS_TOKEN"), async () => {
-  const url = `https://api.travelpayouts.com/aviasales/v3/prices_for_dates?origin=ICN&destination=TYO&departure_at=${ym}&currency=krw&limit=5&sorting=price`;
+  const url = `https://api.travelpayouts.com/aviasales/v3/prices_for_dates?origin=ICN&destination=TYO&departure_at=${ym}&return_at=${ym}&currency=krw&limit=30&sorting=price&one_way=false`;
   const j = await getJson(url, { "X-Access-Token": env("TRAVELPAYOUTS_TOKEN") });
   const n = j.data?.length ?? 0;
   if (!j.success && n === 0) throw new Error(JSON.stringify(j).slice(0, 150));
-  return `ICN→TYO ${ym} 결과 ${n}건, 최저 ${j.data?.[0]?.price ?? "-"}원`;
+  return `ICN→TYO ${ym} 왕복 ${n}건, 최저 ${j.data?.[0]?.price ?? "-"}원`;
 });
 
 await check("TourAPI 행사정보", !!env("DATA_GO_KR_SERVICE_KEY"), async () => {
