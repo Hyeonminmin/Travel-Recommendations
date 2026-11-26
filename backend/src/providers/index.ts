@@ -4,6 +4,7 @@ import { createKakaoPoi } from "./kakao.js";
 import { createKmaWeather } from "./kma.js";
 import { createKmaMidWeather } from "./kmaMid.js";
 import { createOpenMeteoWeather } from "./openMeteo.js";
+import { createHotelFileStore, createSerpApiHotels } from "./serpApiHotels.js";
 import { createSpecialDaysHolidays } from "./specialDays.js";
 import { createTourApiEvents } from "./tourApi.js";
 import { createFileStore, createTourApiLodging } from "./tourApiLodging.js";
@@ -43,6 +44,18 @@ export function createProviders(env: NodeJS.ProcessEnv = process.env): { provide
     providers.lodging = lodging;
     warmUp = () => lodging.warmUp(DESTINATIONS);
     live.push("lodging(TourAPI 공시요금, 국내만·수집 후 적용)");
+  }
+  if (env.SERPAPI_KEY) {
+    // 해외 숙소 1박 요금·평점은 Google Hotels(SerpAPI). 국내는 아래 fallback(TourAPI 공시요금 또는 샘플)로 위임
+    const hotels = createSerpApiHotels(env.SERPAPI_KEY, providers.lodging, {
+      store: createHotelFileStore(env.SERPAPI_CACHE_FILE ?? ".cache/serpapi-hotels.json"),
+      monthlyBudget: env.SERPAPI_MONTHLY_BUDGET ? Number(env.SERPAPI_MONTHLY_BUDGET) : undefined,
+      log: (m) => console.log(`[hotels] ${m}`),
+    });
+    providers.lodging = hotels;
+    const prevWarm = warmUp;
+    warmUp = async () => { await Promise.all([prevWarm(), hotels.warmUp(DESTINATIONS)]); };
+    live.push("lodging+rating(SerpAPI Google Hotels, 해외만·월 캐시·수집 후 적용)");
   }
   if (env.KAKAO_REST_API_KEY) {
     providers.poi = createKakaoPoi(env.KAKAO_REST_API_KEY, mock.poi);
