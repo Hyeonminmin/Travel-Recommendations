@@ -28,6 +28,6 @@
 1. `cd backend && npm install && npm run verify:apis` 를 NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt 와 함께 실행해 OK/FAIL 확인
    - (완료) verify:apis 6/6 OK, TourAPI=KorService2
 2. (완료: TourAPI 행사, 기상청 단기예보, 특일 패널티)
-3. (완료: Kakao POI, 상세 API, 중기예보) android 에 상세 화면/호출 미구현
+3. (완료: Kakao POI, 상세 API, 중기예보, android 상세 화면) 남은 일: 에뮬레이터/실기기에서 앱 실행·레이아웃 확인, 국내 숙소 평점 SerpAPI 보강
 4. (완료: 숙소 가격 소스 검토, 국내 숙소 요금 Provider) 해외 숙소 가격은 파트너 계약 전까지 샘플. TourAPI 일일 호출 한도가 있을 수 있음(미확인): 행사는 캐시 추가로 /recommend 당 호출이 사실상 0~4회(6시간당 지역별 1~3회)로 감소
 5. 각 Provider 는 실패 시 Mock fallback 유지, 단위 테스트(가짜 fetch) 추가
