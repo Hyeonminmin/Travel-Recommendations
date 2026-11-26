@@ -11,7 +11,7 @@ const MAX_DURATION_DAYS = 120; // 연중 상설 프로그램(예: 1/1~12/31 상�
  * 목적지 → TourAPI 법정동 시도코드(lDongRegnCd). 응답의 areacode 는 비어 있고 areaCode 필터도 동작하지 않아
  * lDongRegnCd 를 사용한다. city 가 있으면 주소(addr1)에 해당 시 이름이 포함된 행사만 남긴다.
  */
-const REGIONS: Record<string, { regionCode: string; city?: string }> = {
+export const REGIONS: Record<string, { regionCode: string; city?: string }> = {
   jeju: { regionCode: "50" },
   busan: { regionCode: "26" },
   gangneung: { regionCode: "51", city: "강릉" },

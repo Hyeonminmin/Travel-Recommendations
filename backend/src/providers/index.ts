@@ -1,3 +1,4 @@
+import { DESTINATIONS } from "../data.js";
 import { createMockProviders } from "./mock.js";
 import { createKakaoPoi } from "./kakao.js";
 import { createKmaWeather } from "./kma.js";
@@ -5,13 +6,15 @@ import { createKmaMidWeather } from "./kmaMid.js";
 import { createOpenMeteoWeather } from "./openMeteo.js";
 import { createSpecialDaysHolidays } from "./specialDays.js";
 import { createTourApiEvents } from "./tourApi.js";
+import { createFileStore, createTourApiLodging } from "./tourApiLodging.js";
 import { createTravelpayoutsFlight } from "./travelpayouts.js";
 import type { Providers } from "./types.js";
 
 /** 키가 있는 소스만 실제 Provider 로 교체하고 나머지는 Mock 유지. */
-export function createProviders(env: NodeJS.ProcessEnv = process.env): { providers: Providers; live: string[] } {
+export function createProviders(env: NodeJS.ProcessEnv = process.env): { providers: Providers; live: string[]; warmUp: () => Promise<void> } {
   const mock = createMockProviders();
   const live: string[] = [];
+  let warmUp: () => Promise<void> = async () => {};
   const providers: Providers = { ...mock };
   if (env.USE_OPEN_METEO !== "false") {
     providers.weather = createOpenMeteoWeather(mock.weather);
@@ -32,10 +35,18 @@ export function createProviders(env: NodeJS.ProcessEnv = process.env): { provide
     live.push("event(tourapi, 국내만)");
     providers.holiday = createSpecialDaysHolidays(env.DATA_GO_KR_SERVICE_KEY, mock.holiday);
     live.push("holiday(특일정보)");
+    // 숙소 요금은 상세 조회가 느려(호출당 ~5초) 서버 시작 시 백그라운드로 수집·파일 캐시. 수집 전에는 샘플값.
+    const lodging = createTourApiLodging(env.DATA_GO_KR_SERVICE_KEY, mock.lodging, {
+      store: createFileStore(env.LODGING_CACHE_FILE ?? ".cache/lodging.json"),
+      log: (m) => console.log(`[lodging] ${m}`),
+    });
+    providers.lodging = lodging;
+    warmUp = () => lodging.warmUp(DESTINATIONS);
+    live.push("lodging(TourAPI 공시요금, 국내만·수집 후 적용)");
   }
   if (env.KAKAO_REST_API_KEY) {
     providers.poi = createKakaoPoi(env.KAKAO_REST_API_KEY, mock.poi);
     live.push("poi(kakao 로컬, 국내만)");
   }
-  return { providers, live };
+  return { providers, live, warmUp };
 }
