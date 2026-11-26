@@ -47,4 +47,18 @@ describe("POST /destination/:id", () => {
     expect((await post(guarded, "busan")).statusCode).toBe(401);
     expect((await post(guarded, "busan", body, { authorization: "Bearer t" })).statusCode).toBe(200);
   });
+  it("금액은 소수 값이 들어와도 정수로 내고 recommendation 총액과 cost 합계가 일치(Android Long 디코딩 계약)", async () => {
+    const mock = createMockProviders();
+    const frac = {
+      ...mock,
+      flight: { roundTripPerPersonKRW: async () => ({ value: 123_456.7, source: "t", asOf: "", estimated: false }) },
+      lodging: { ...mock.lodging, perNightKRW: async () => ({ value: 98_765.4, source: "t", asOf: "", estimated: false }) },
+    };
+    const j = (await post(buildServer({ providers: frac }), "tokyo", { ...body, travelers: 3 })).json();
+    for (const k of Object.keys(j.cost)) expect(Number.isInteger(j.cost[k])).toBe(true);
+    expect(Number.isInteger(j.recommendation.estimatedTotalKRW)).toBe(true);
+    expect(j.recommendation.estimatedTotalKRW).toBe(j.cost.totalKRW);
+    expect(j.cost.flightTotalKRW).toBe(123_457 * 3);
+  });
 });
+

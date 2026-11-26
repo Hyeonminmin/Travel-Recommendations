@@ -126,12 +126,15 @@ export async function evaluateDestination(
     providers.poi.poi(dest),
   ]);
 
+  // 클라이언트(Android)가 금액을 Long 으로 디코딩하므로 모든 금액은 정수(원)로 반올림해 일관되게 낸다
+  const flightPerPerson = Math.round(flight.value);
+  const lodgingPerNight = Math.round(night.value);
   const cost = {
-    flightPerPersonKRW: flight.value,
-    flightTotalKRW: flight.value * req.travelers,
-    lodgingPerNightKRW: night.value,
-    lodgingTotalKRW: night.value * nights * rooms,
-    localSpendKRW: dest.dailySpendKRW * req.travelers * nights,
+    flightPerPersonKRW: flightPerPerson,
+    flightTotalKRW: flightPerPerson * req.travelers,
+    lodgingPerNightKRW: lodgingPerNight,
+    lodgingTotalKRW: lodgingPerNight * nights * rooms,
+    localSpendKRW: Math.round(dest.dailySpendKRW * req.travelers * nights),
     totalKRW: 0,
   };
   cost.totalKRW = cost.flightTotalKRW + cost.lodgingTotalKRW + cost.localSpendKRW;

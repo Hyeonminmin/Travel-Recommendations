@@ -2,6 +2,8 @@ package com.travelrec.ui
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyListState
+import androidx.compose.foundation.lazy.rememberLazyListState
 import androidx.compose.foundation.lazy.items
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -18,10 +20,11 @@ private val SCOPES = listOf("both" to "전체", "domestic" to "국내", "interna
 
 @OptIn(ExperimentalMaterial3Api::class, ExperimentalLayoutApi::class)
 @Composable
-fun RecommendScreen(vm: RecommendViewModel) {
+fun RecommendScreen(vm: RecommendViewModel, listState: LazyListState = rememberLazyListState()) {
     val s by vm.state.collectAsStateWithLifecycle()
 
     LazyColumn(
+        state = listState,
         modifier = Modifier.fillMaxSize().statusBarsPadding().padding(horizontal = 16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
@@ -56,7 +59,7 @@ fun RecommendScreen(vm: RecommendViewModel) {
         }
         s.error?.let { item { Text(it, color = MaterialTheme.colorScheme.error) } }
         s.response?.let { resp ->
-            items(resp.results, key = { it.destinationId }) { RecommendationCard(it) }
+            items(resp.results, key = { it.destinationId }) { RecommendationCard(it, onDetail = { vm.openDetail(it) }) }
             if (resp.excluded.isNotEmpty()) {
                 item {
                     Text(
@@ -94,7 +97,7 @@ private fun WeightRow(label: String, value: Double, onChange: (Double) -> Unit) 
 }
 
 @Composable
-private fun RecommendationCard(r: Recommendation) {
+private fun RecommendationCard(r: Recommendation, onDetail: () -> Unit) {
     val uri = LocalUriHandler.current
     var expanded by remember { mutableStateOf(false) }
     Card(modifier = Modifier.fillMaxWidth(), onClick = { expanded = !expanded }) {
@@ -103,11 +106,12 @@ private fun RecommendationCard(r: Recommendation) {
                 Text("${r.name} (${r.country})", style = MaterialTheme.typography.titleMedium)
                 Text("%.1f점".format(r.totalScore), style = MaterialTheme.typography.titleMedium)
             }
-            Text("예상 총액 약 ${r.estimatedTotalKRW / 10_000}만원", style = MaterialTheme.typography.bodyMedium)
+            Text("예상 총액 약 ${manWon(r.estimatedTotalKRW)}", style = MaterialTheme.typography.bodyMedium)
             if (expanded) {
                 r.breakdown.forEach { f ->
                     Text("• ${factorLabel(f.factor)} ${(f.score * 100).toInt()}점 (가중치 ${(f.weight * 100).toInt()}%) — ${f.reason}", style = MaterialTheme.typography.bodySmall)
                 }
+                r.penalties.forEach { Text("• 혼잡 패널티 -${"%.0f".format(it.points)}점 — ${it.reason}", style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error) }
                 r.dataNotes.forEach { Text(it, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline) }
                 Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
                     r.links.forEach { l -> OutlinedButton(onClick = { uri.openUri(l.url) }) { Text(l.label, style = MaterialTheme.typography.labelSmall) } }
@@ -115,10 +119,7 @@ private fun RecommendationCard(r: Recommendation) {
             } else {
                 Text("탭해서 점수 근거 보기", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
             }
+            TextButton(onClick = onDetail) { Text("상세 보기 →") }
         }
     }
-}
-
-private fun factorLabel(k: String) = when (k) {
-    "cost" -> "가격"; "weather" -> "날씨"; "event" -> "축제"; "lodging" -> "숙소"; "poi" -> "볼거리"; "logistics" -> "이동"; else -> k
 }

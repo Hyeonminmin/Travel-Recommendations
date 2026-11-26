@@ -12,7 +12,9 @@
   - 해외 숙소 가격 대안 검토 결과: Hotellook 호스트 차단·서비스 상태 불명, Amadeus Self-Service 종료, Agoda-Demand 는 기업 파트너 계약 필요
   - Mock: 국내 숙소 평점, 국내선/국내 교통, 볼거리
 - 상세 API: POST /destination/:id — /recommend 와 같은 요청 본문(가중치·태그가 같아야 목록 점수와 일치, scope 무시). 응답: destination, trip, withinBudget(예산 초과여도 상세는 반환), recommendation, cost(항공/숙소/현지 내역), weather, events, holidays, places, sources(항목별 출처·asOf·estimated), links. 없는 id 404. 평가 로직은 scoring.ts evaluateDestination 으로 /recommend 와 공유
-- android: Compose 스캐폴딩(빌드 미검증, SDK 없음)
+- android: Compose 앱. 목록(RecommendScreen) + 상세(DetailScreen, POST /destination/{id}). 내비게이션 라이브러리 없이 UiState.detail 로 화면 전환 + BackHandler, 목록 스크롤 위치는 MainActivity 에서 LazyListState 보관. 상세는 검색 때 저장한 lastRequest 로 호출(입력창을 고쳐도 목록과 같은 점수), 늦게 온 응답은 destinationId 로 무시, 닫기 시 취소, 오류 시 재시도. 순수 로직은 ui/Format.kt(금액·KST 시각·출처 라벨). Models.kt 에 penalties/places/DestinationDetail 추가(구버전 응답 호환 기본값)
+  - 검증 상태: Android SDK 가 없어 앱 전체 빌드·실기기 실행은 미검증. 대신 (1) 데이터 계층+ViewModel+Format 을 JVM 프로젝트로 컴파일하고 실제 백엔드와 Retrofit 로 통신하는 테스트 20개 통과, (2) Compose UI(DetailScreen/RecommendScreen)를 Compose Multiplatform 데스크톱으로 컴파일 통과(안드로이드 전용 API 3개는 shim). 화면 렌더링(스크린샷)은 Google Maven(dl.google.com) 이 이 환경에서 차단돼 못 함 → 실제 레이아웃은 에뮬레이터에서 확인 필요
+  - 하네스는 세션 스크래치패드에만 있고 저장소에는 없음(필요하면 android/ 아래로 옮겨 CI 로 사용 가능). 코드 변경이 없는 JUnit 주의: `fun t() = runBlocking { ... }` 가 값을 반환하면 JUnit 이 테스트를 조용히 건너뜀 → runBlocking<Unit> 사용
 - Travelpayouts 토큰은 환경의 Network secret(헤더 X-Access-Token)으로 저장됨. 프록시가 주입하므로
   코드에서는 TRAVELPAYOUTS_TOKEN=proxy-injected 로 실행. 이 환경에서 Node fetch 로 호출하려면
   `NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt` 필요.

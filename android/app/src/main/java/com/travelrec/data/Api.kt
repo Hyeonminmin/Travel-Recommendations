@@ -10,10 +10,15 @@ import okhttp3.logging.HttpLoggingInterceptor
 import retrofit2.Retrofit
 import retrofit2.http.Body
 import retrofit2.http.POST
+import retrofit2.http.Path
 
 interface TravelApi {
     @POST("recommend")
     suspend fun recommend(@Body request: RecommendRequest): RecommendResponse
+
+    /** 목록과 같은 요청 본문을 보내야 점수·가중치가 목록과 일치한다. */
+    @POST("destination/{id}")
+    suspend fun destination(@Path("id") id: String, @Body request: RecommendRequest): DestinationDetail
 }
 
 /** 수동 DI. 규모가 커지면 Hilt 로 전환. 앱에는 외부 API 키 대신 자체 서버 토큰만 둔다. */
