@@ -5,6 +5,8 @@ import {
   type Destination,
   type ExcludedDestination,
   type FactorResult,
+  type Holiday,
+  type Penalty,
   type Recommendation,
   type RecommendRequest,
 } from "./types.js";
@@ -53,6 +55,19 @@ export function logisticsScore(flightHours: number): number {
   return clamp01(1 - flightHours / 12);
 }
 
+export const HOLIDAY_PENALTY_PER_DAY = 3; // 총점(0..100) 차감, 임의 튜닝값
+export const HOLIDAY_PENALTY_MAX = 10;
+
+/**
+ * 공휴일 혼잡 패널티. 국내 여행만 대상(해외는 항공가에 이미 수요가 반영되고, 현지 혼잡과는 무관).
+ * 여행 기간에 걸친 공휴일 하루당 3점, 최대 10점을 총점에서 차감한다.
+ */
+export function holidayPenalty(dest: Destination, holidays: Holiday[]): Penalty | null {
+  if (!dest.domestic || holidays.length === 0) return null;
+  const points = Math.min(HOLIDAY_PENALTY_MAX, holidays.length * HOLIDAY_PENALTY_PER_DAY);
+  return { kind: "holiday-congestion", points, reason: `공휴일 ${holidays.length}일 포함(${[...new Set(holidays.map((h) => h.name))].join(", ")}) — 혼잡·가격 상승 가능` };
+}
+
 function links(dest: Destination, req: RecommendRequest) {
   const q = encodeURIComponent;
   const out = [
@@ -83,6 +98,7 @@ export async function recommend(
     req.scope === "both" ? true : req.scope === "domestic" ? d.domestic : !d.domestic,
   );
 
+  const holidays = await providers.holiday.holidays(q); // 국내 공통이므로 요청당 1회
   const results: Recommendation[] = [];
   const excluded: ExcludedDestination[] = [];
 
@@ -118,7 +134,10 @@ export async function recommend(
       };
 
       const breakdown: FactorResult[] = WEIGHT_KEYS.map((k) => ({ factor: k, score: raw[k].score, weight: weights[k], reason: raw[k].reason }));
-      const totalScore = Math.round(breakdown.reduce((a, b) => a + b.score * b.weight, 0) * 1000) / 10;
+      const penalty = holidayPenalty(dest, holidays.value);
+      const penalties = penalty ? [penalty] : [];
+      const base = Math.round(breakdown.reduce((a, b) => a + b.score * b.weight, 0) * 1000) / 10;
+      const totalScore = Math.max(0, Math.round((base - (penalty?.points ?? 0)) * 10) / 10);
 
       const estimated = [flight, night, rating, weather, events].some((s) => s.estimated);
       results.push({
@@ -129,7 +148,12 @@ export async function recommend(
         estimatedTotalKRW: total,
         breakdown,
         events: events.value,
-        dataNotes: estimated ? ["가격·날씨·행사 값은 샘플/추정치입니다. 최종 가격은 예약 사이트에서 확인하세요."] : [],
+        penalties,
+        dataNotes: [
+          ...(estimated ? ["가격·날씨·행사 값은 샘플/추정치입니다. 최종 가격은 예약 사이트에서 확인하세요."] : []),
+          // 공휴일 API 실패 시 음력 명절·대체공휴일이 빠진다 → 국내 결과에만 안내
+          ...(dest.domestic && holidays.estimated ? ["공휴일 정보를 불러오지 못해 설날·추석·대체공휴일 등이 혼잡 패널티에 반영되지 않았을 수 있습니다."] : []),
+        ],
         links: links(dest, req),
       });
     }),

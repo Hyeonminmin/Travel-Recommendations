@@ -1,4 +1,4 @@
-import type { Destination, Sourced, TripEvent } from "../types.js";
+import type { Destination, Holiday, Sourced, TripEvent } from "../types.js";
 
 export interface TripQuery {
   origin: string;
@@ -21,9 +21,14 @@ export interface WeatherProvider {
 export interface EventProvider {
   events(dest: Destination, q: TripQuery): Promise<Sourced<TripEvent[]>>;
 }
+export interface HolidayProvider {
+  /** 여행 기간(포함)에 걸친 국내 공휴일(대체공휴일 포함) */
+  holidays(q: TripQuery): Promise<Sourced<Holiday[]>>;
+}
 export interface Providers {
   flight: FlightProvider;
   lodging: LodgingProvider;
   weather: WeatherProvider;
   event: EventProvider;
+  holiday: HolidayProvider;
 }

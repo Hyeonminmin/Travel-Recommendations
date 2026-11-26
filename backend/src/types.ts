@@ -58,6 +58,18 @@ export interface TripEvent {
   endDate: string;
 }
 
+export interface Holiday {
+  date: string; // YYYY-MM-DD
+  name: string;
+}
+
+/** 총점에서 차감되는 항목(가중치 factor 와 별개). */
+export interface Penalty {
+  kind: "holiday-congestion";
+  points: number; // 총점(0..100)에서 차감되는 점수
+  reason: string;
+}
+
 export interface FactorResult {
   factor: FactorKey;
   score: number; // 0..1
@@ -73,6 +85,7 @@ export interface Recommendation {
   estimatedTotalKRW: number;
   breakdown: FactorResult[];
   events: TripEvent[];
+  penalties: Penalty[];
   dataNotes: string[]; // 추정치/샘플 안내
   links: { label: string; url: string }[];
 }
