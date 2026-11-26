@@ -28,4 +28,11 @@ describe("open-meteo weather", () => {
     const r = await createOpenMeteoWeather(createMockProviders().weather, f, today).forecast(jeju, q("2026-12-20", "2026-12-24"));
     expect(r.source).toContain("mock");
   });
+  it("일시적 연결 오류는 1회 재시도해 평년값을 얻는다", async () => {
+    let n = 0;
+    const f = (async () => { if (n++ === 0) throw new Error("ECONNRESET"); return new Response(JSON.stringify({ daily: { temperature_2m_mean: [5, 7], precipitation_sum: [0, 3] } })); }) as unknown as typeof fetch;
+    const r = await createOpenMeteoWeather(createMockProviders().weather, f, today).forecast(jeju, q("2027-02-10", "2027-02-12"));
+    expect(r.source).toContain("open-meteo");
+    expect(r.value.avgTempC).toBe(6);
+  });
 });

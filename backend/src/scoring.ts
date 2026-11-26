@@ -7,6 +7,9 @@ import {
   type FactorResult,
   type Holiday,
   type Penalty,
+  type PoiInfo,
+  type Sourced,
+  type TripEvent,
   type Recommendation,
   type RecommendRequest,
 } from "./types.js";
@@ -84,16 +87,118 @@ function links(dest: Destination, req: RecommendRequest) {
   return out;
 }
 
-export async function recommend(
+export interface Evaluation {
+  recommendation: Recommendation; // 예산 초과여도 점수는 계산된다(cost 점수 0)
+  withinBudget: boolean;
+  nights: number;
+  rooms: number;
+  cost: { flightPerPersonKRW: number; flightTotalKRW: number; lodgingPerNightKRW: number; lodgingTotalKRW: number; localSpendKRW: number; totalKRW: number };
+  sources: {
+    flight: Sourced<number>;
+    lodging: Sourced<number>;
+    lodgingRating: Sourced<number>;
+    weather: Sourced<{ avgTempC: number; rainProb: number }>;
+    event: Sourced<TripEvent[]>;
+    holiday: Sourced<Holiday[]>;
+    poi: Sourced<PoiInfo>;
+  };
+  holidays: Holiday[]; // 이 목적지에 적용된 공휴일(국내만)
+}
+
+/** 목적지 1곳을 평가한다. /recommend 와 /destination/:id 가 같은 로직을 쓴다. */
+export async function evaluateDestination(
+  dest: Destination,
   req: RecommendRequest,
   providers: Providers,
-  destinations: Destination[] = DESTINATIONS,
-): Promise<{ results: Recommendation[]; excluded: ExcludedDestination[] }> {
+  holidays: Sourced<Holiday[]>,
+): Promise<Evaluation> {
   const weights = normalizeWeights(req.weights);
   const nights = nightsBetween(req.startDate, req.endDate);
   const q = { origin: req.origin, startDate: req.startDate, endDate: req.endDate, travelers: req.travelers };
   const rooms = Math.ceil(req.travelers / 2);
 
+  const [flight, night, rating, weather, events, poi] = await Promise.all([
+    providers.flight.roundTripPerPersonKRW(dest, q),
+    providers.lodging.perNightKRW(dest, q),
+    providers.lodging.rating(dest),
+    providers.weather.forecast(dest, q),
+    providers.event.events(dest, q),
+    providers.poi.poi(dest),
+  ]);
+
+  const cost = {
+    flightPerPersonKRW: flight.value,
+    flightTotalKRW: flight.value * req.travelers,
+    lodgingPerNightKRW: night.value,
+    lodgingTotalKRW: night.value * nights * rooms,
+    localSpendKRW: dest.dailySpendKRW * req.travelers * nights,
+    totalKRW: 0,
+  };
+  cost.totalKRW = cost.flightTotalKRW + cost.lodgingTotalKRW + cost.localSpendKRW;
+  const total = cost.totalKRW;
+
+  const raw: Record<(typeof WEIGHT_KEYS)[number], { score: number; reason: string }> = {
+    cost: { score: costScore(total, req.budgetKRW), reason: `예상 총 ${krw(total)} (예산의 ${Math.round((total / req.budgetKRW) * 100)}%)` },
+    weather: {
+      score: weatherScore(weather.value.avgTempC, weather.value.rainProb, req.idealTempC),
+      reason: `평균 ${weather.value.avgTempC}℃, 강수확률 ${Math.round(weather.value.rainProb * 100)}%`,
+    },
+    event: {
+      score: eventScore(events.value, req.tags),
+      reason: events.value.length ? events.value.map((e) => e.name).join(", ") : "기간 내 주요 행사 없음",
+    },
+    lodging: { score: lodgingScore(rating.value), reason: `숙소 평점 ${rating.value.toFixed(1)}/5` },
+    poi: {
+      score: poiScore(dest, req.tags, poi.value.density),
+      reason: `취향 태그 일치: ${dest.tags.filter((t) => req.tags.includes(t)).join(", ") || "없음"}${
+        poi.value.attractionCount !== undefined ? ` · 반경 20km 관광명소 ${poi.value.attractionCount.toLocaleString("ko-KR")}곳, 음식점 ${(poi.value.restaurantCount ?? 0).toLocaleString("ko-KR")}곳` : ""
+      }`,
+    },
+    logistics: { score: logisticsScore(dest.flightHours), reason: `이동 약 ${dest.flightHours}시간` },
+  };
+
+  const breakdown: FactorResult[] = WEIGHT_KEYS.map((k) => ({ factor: k, score: raw[k].score, weight: weights[k], reason: raw[k].reason }));
+  const penalty = holidayPenalty(dest, holidays.value);
+  const penalties = penalty ? [penalty] : [];
+  const base = Math.round(breakdown.reduce((a, b) => a + b.score * b.weight, 0) * 1000) / 10;
+  const totalScore = Math.max(0, Math.round((base - (penalty?.points ?? 0)) * 10) / 10);
+
+  const estimated = [flight, night, rating, weather, events, poi].some((s) => s.estimated);
+  const recommendation: Recommendation = {
+    destinationId: dest.id,
+    name: dest.name,
+    country: dest.country,
+    totalScore,
+    estimatedTotalKRW: total,
+    breakdown,
+    events: events.value,
+    penalties,
+    places: { attractions: poi.value.attractions, restaurants: poi.value.restaurants },
+    dataNotes: [
+      ...(estimated ? ["가격·날씨·행사 값은 샘플/추정치입니다. 최종 가격은 예약 사이트에서 확인하세요."] : []),
+      // 공휴일 API 실패 시 음력 명절·대체공휴일이 빠진다 → 국내 결과에만 안내
+      ...(dest.domestic && holidays.estimated ? ["공휴일 정보를 불러오지 못해 설날·추석·대체공휴일 등이 혼잡 패널티에 반영되지 않았을 수 있습니다."] : []),
+    ],
+    links: links(dest, req),
+  };
+
+  return {
+    recommendation,
+    withinBudget: total <= req.budgetKRW,
+    nights,
+    rooms,
+    cost,
+    sources: { flight, lodging: night, lodgingRating: rating, weather, event: events, holiday: holidays, poi },
+    holidays: dest.domestic ? holidays.value : [],
+  };
+}
+
+export async function recommend(
+  req: RecommendRequest,
+  providers: Providers,
+  destinations: Destination[] = DESTINATIONS,
+): Promise<{ results: Recommendation[]; excluded: ExcludedDestination[] }> {
+  const q = { origin: req.origin, startDate: req.startDate, endDate: req.endDate, travelers: req.travelers };
   const candidates = destinations.filter((d) =>
     req.scope === "both" ? true : req.scope === "domestic" ? d.domestic : !d.domestic,
   );
@@ -104,65 +209,12 @@ export async function recommend(
 
   await Promise.all(
     candidates.map(async (dest) => {
-      const [flight, night, rating, weather, events, poi] = await Promise.all([
-        providers.flight.roundTripPerPersonKRW(dest, q),
-        providers.lodging.perNightKRW(dest, q),
-        providers.lodging.rating(dest),
-        providers.weather.forecast(dest, q),
-        providers.event.events(dest, q),
-        providers.poi.poi(dest),
-      ]);
-
-      const total = flight.value * req.travelers + night.value * nights * rooms + dest.dailySpendKRW * req.travelers * nights;
-      if (total > req.budgetKRW) {
-        excluded.push({ destinationId: dest.id, name: dest.name, reason: `예상 ${krw(total)} > 예산 ${krw(req.budgetKRW)}` });
+      const ev = await evaluateDestination(dest, req, providers, holidays);
+      if (!ev.withinBudget) {
+        excluded.push({ destinationId: dest.id, name: dest.name, reason: `예상 ${krw(ev.cost.totalKRW)} > 예산 ${krw(req.budgetKRW)}` });
         return;
       }
-
-      const raw: Record<(typeof WEIGHT_KEYS)[number], { score: number; reason: string }> = {
-        cost: { score: costScore(total, req.budgetKRW), reason: `예상 총 ${krw(total)} (예산의 ${Math.round((total / req.budgetKRW) * 100)}%)` },
-        weather: {
-          score: weatherScore(weather.value.avgTempC, weather.value.rainProb, req.idealTempC),
-          reason: `평균 ${weather.value.avgTempC}℃, 강수확률 ${Math.round(weather.value.rainProb * 100)}%`,
-        },
-        event: {
-          score: eventScore(events.value, req.tags),
-          reason: events.value.length ? events.value.map((e) => e.name).join(", ") : "기간 내 주요 행사 없음",
-        },
-        lodging: { score: lodgingScore(rating.value), reason: `숙소 평점 ${rating.value.toFixed(1)}/5` },
-        poi: {
-          score: poiScore(dest, req.tags, poi.value.density),
-          reason: `취향 태그 일치: ${dest.tags.filter((t) => req.tags.includes(t)).join(", ") || "없음"}${
-            poi.value.attractionCount !== undefined ? ` · 반경 20km 관광명소 ${poi.value.attractionCount.toLocaleString("ko-KR")}곳, 음식점 ${(poi.value.restaurantCount ?? 0).toLocaleString("ko-KR")}곳` : ""
-          }`,
-        },
-        logistics: { score: logisticsScore(dest.flightHours), reason: `이동 약 ${dest.flightHours}시간` },
-      };
-
-      const breakdown: FactorResult[] = WEIGHT_KEYS.map((k) => ({ factor: k, score: raw[k].score, weight: weights[k], reason: raw[k].reason }));
-      const penalty = holidayPenalty(dest, holidays.value);
-      const penalties = penalty ? [penalty] : [];
-      const base = Math.round(breakdown.reduce((a, b) => a + b.score * b.weight, 0) * 1000) / 10;
-      const totalScore = Math.max(0, Math.round((base - (penalty?.points ?? 0)) * 10) / 10);
-
-      const estimated = [flight, night, rating, weather, events, poi].some((s) => s.estimated);
-      results.push({
-        destinationId: dest.id,
-        name: dest.name,
-        country: dest.country,
-        totalScore,
-        estimatedTotalKRW: total,
-        breakdown,
-        events: events.value,
-        penalties,
-        places: { attractions: poi.value.attractions, restaurants: poi.value.restaurants },
-        dataNotes: [
-          ...(estimated ? ["가격·날씨·행사 값은 샘플/추정치입니다. 최종 가격은 예약 사이트에서 확인하세요."] : []),
-          // 공휴일 API 실패 시 음력 명절·대체공휴일이 빠진다 → 국내 결과에만 안내
-          ...(dest.domestic && holidays.estimated ? ["공휴일 정보를 불러오지 못해 설날·추석·대체공휴일 등이 혼잡 패널티에 반영되지 않았을 수 있습니다."] : []),
-        ],
-        links: links(dest, req),
-      });
+      results.push(ev.recommendation);
     }),
   );
 

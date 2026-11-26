@@ -14,9 +14,17 @@ const mean = (xs: number[]) => xs.reduce((a, b) => a + b, 0) / xs.length;
  */
 export function createOpenMeteoWeather(fallback: WeatherProvider, fetchFn: Fetch = fetch, today = () => new Date()): WeatherProvider {
   async function json(url: string) {
-    const res = await fetchFn(url);
-    if (!res.ok) throw new Error(`open-meteo HTTP ${res.status}`);
-    return (await res.json()) as { daily?: Record<string, (number | null)[]> };
+    let lastErr: unknown;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        const res = await fetchFn(url);
+        if (!res.ok) throw new Error(`open-meteo HTTP ${res.status}`);
+        return (await res.json()) as { daily?: Record<string, (number | null)[]> };
+      } catch (e) {
+        lastErr = e; // 평년값은 3회 연속 호출이라 연결 reset 한 번에 전체가 fallback 되지 않도록 1회 재시도
+      }
+    }
+    throw lastErr;
   }
   const clean = (xs: (number | null)[] | undefined) => (xs ?? []).filter((x): x is number => typeof x === "number");
 
