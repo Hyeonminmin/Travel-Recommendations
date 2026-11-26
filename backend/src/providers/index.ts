@@ -1,4 +1,5 @@
 import { createMockProviders } from "./mock.js";
+import { createKmaWeather } from "./kma.js";
 import { createOpenMeteoWeather } from "./openMeteo.js";
 import { createTourApiEvents } from "./tourApi.js";
 import { createTravelpayoutsFlight } from "./travelpayouts.js";
@@ -12,6 +13,11 @@ export function createProviders(env: NodeJS.ProcessEnv = process.env): { provide
   if (env.USE_OPEN_METEO !== "false") {
     providers.weather = createOpenMeteoWeather(mock.weather);
     live.push("weather(open-meteo)");
+  }
+  if (env.DATA_GO_KR_SERVICE_KEY) {
+    // 국내 + 3일 이내는 기상청, 그 외는 기존 weather(Open-Meteo→Mock)로 위임
+    providers.weather = createKmaWeather(env.DATA_GO_KR_SERVICE_KEY, providers.weather);
+    live.push("weather(기상청 단기예보, 국내 3일 이내)");
   }
   if (env.TRAVELPAYOUTS_TOKEN) {
     providers.flight = createTravelpayoutsFlight(env.TRAVELPAYOUTS_TOKEN, mock.flight);

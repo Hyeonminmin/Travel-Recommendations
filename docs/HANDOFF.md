@@ -5,6 +5,7 @@
 - backend: 점수 엔진, POST /recommend, Provider 어댑터
   - 실제 연동: Open-Meteo 날씨(키 불필요), Travelpayouts 해외 항공 캐시 왕복가(월 단위 조회 후 근접 날짜 선택)
   - TourAPI 행사(국내 4곳): KorService2 searchFestival2. 지역 필터는 areaCode 가 아니라 lDongRegnCd(제주50/부산26/강원51/전남12, 강릉·여수는 addr1 시 이름으로 추가 필터). 일정과 겹치는 행사만, 120일 초과 상설 제외, 상위 5건. 실패 시 Mock fallback, 연결 reset 대비 1회 재시도
+  - 기상청 단기예보(국내): getVilageFcst, 위경도→격자 변환(toGrid), 최근 발표 회차 자동 선택. 단기예보는 발표일~+3일만 커버 → 국내이면서 여행 전체가 3일 이내일 때만 사용, 그 외는 Open-Meteo→Mock 체인으로 위임. 4~10일 구간은 중기예보(별도 API) 미구현이라 Open-Meteo 사용
   - Mock: 숙소, 국내선/국내 교통, 볼거리
 - android: Compose 스캐폴딩(빌드 미검증, SDK 없음)
 - Travelpayouts 토큰은 환경의 Network secret(헤더 X-Access-Token)으로 저장됨. 프록시가 주입하므로
@@ -19,7 +20,7 @@
 ## 다음 작업
 1. `cd backend && npm install && npm run verify:apis` 를 NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt 와 함께 실행해 OK/FAIL 확인
    - (완료) verify:apis 6/6 OK, TourAPI=KorService2
-2. (완료: TourAPI 행사 Provider) 기상청 단기예보(국내 15일 이내), 특일(공휴일 혼잡 패널티) 구현
+2. (완료: TourAPI 행사, 기상청 단기예보) 특일(공휴일 혼잡 패널티) 구현
 3. Kakao 로컬 기반 식당/볼거리 Provider 추가, 결과 상세 API(/destination/{id})
 4. 숙소 가격 소스 검토(Travelpayouts Hotellook 가능 여부)
 5. 각 Provider 는 실패 시 Mock fallback 유지, 단위 테스트(가짜 fetch) 추가
