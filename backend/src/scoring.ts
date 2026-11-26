@@ -46,9 +46,9 @@ export function lodgingScore(rating: number): number {
   return clamp01((rating - 3) / 2);
 }
 /** 볼거리 밀도 70% + 취향 태그 일치율 30% */
-export function poiScore(dest: Destination, userTags: string[]): number {
+export function poiScore(dest: Destination, userTags: string[], density: number = dest.poiDensity): number {
   const match = userTags.length ? dest.tags.filter((t) => userTags.includes(t)).length / userTags.length : 0.5;
-  return clamp01(0.7 * dest.poiDensity + 0.3 * match);
+  return clamp01(0.7 * density + 0.3 * match);
 }
 /** 비행시간 0h=1점, 12h=0점 */
 export function logisticsScore(flightHours: number): number {
@@ -104,12 +104,13 @@ export async function recommend(
 
   await Promise.all(
     candidates.map(async (dest) => {
-      const [flight, night, rating, weather, events] = await Promise.all([
+      const [flight, night, rating, weather, events, poi] = await Promise.all([
         providers.flight.roundTripPerPersonKRW(dest, q),
         providers.lodging.perNightKRW(dest, q),
         providers.lodging.rating(dest),
         providers.weather.forecast(dest, q),
         providers.event.events(dest, q),
+        providers.poi.poi(dest),
       ]);
 
       const total = flight.value * req.travelers + night.value * nights * rooms + dest.dailySpendKRW * req.travelers * nights;
@@ -129,7 +130,12 @@ export async function recommend(
           reason: events.value.length ? events.value.map((e) => e.name).join(", ") : "기간 내 주요 행사 없음",
         },
         lodging: { score: lodgingScore(rating.value), reason: `숙소 평점 ${rating.value.toFixed(1)}/5` },
-        poi: { score: poiScore(dest, req.tags), reason: `취향 태그 일치: ${dest.tags.filter((t) => req.tags.includes(t)).join(", ") || "없음"}` },
+        poi: {
+          score: poiScore(dest, req.tags, poi.value.density),
+          reason: `취향 태그 일치: ${dest.tags.filter((t) => req.tags.includes(t)).join(", ") || "없음"}${
+            poi.value.attractionCount !== undefined ? ` · 반경 20km 관광명소 ${poi.value.attractionCount.toLocaleString("ko-KR")}곳, 음식점 ${(poi.value.restaurantCount ?? 0).toLocaleString("ko-KR")}곳` : ""
+          }`,
+        },
         logistics: { score: logisticsScore(dest.flightHours), reason: `이동 약 ${dest.flightHours}시간` },
       };
 
@@ -139,7 +145,7 @@ export async function recommend(
       const base = Math.round(breakdown.reduce((a, b) => a + b.score * b.weight, 0) * 1000) / 10;
       const totalScore = Math.max(0, Math.round((base - (penalty?.points ?? 0)) * 10) / 10);
 
-      const estimated = [flight, night, rating, weather, events].some((s) => s.estimated);
+      const estimated = [flight, night, rating, weather, events, poi].some((s) => s.estimated);
       results.push({
         destinationId: dest.id,
         name: dest.name,
@@ -149,6 +155,7 @@ export async function recommend(
         breakdown,
         events: events.value,
         penalties,
+        places: { attractions: poi.value.attractions, restaurants: poi.value.restaurants },
         dataNotes: [
           ...(estimated ? ["가격·날씨·행사 값은 샘플/추정치입니다. 최종 가격은 예약 사이트에서 확인하세요."] : []),
           // 공휴일 API 실패 시 음력 명절·대체공휴일이 빠진다 → 국내 결과에만 안내

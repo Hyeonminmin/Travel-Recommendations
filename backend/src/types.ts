@@ -58,6 +58,14 @@ export interface TripEvent {
   endDate: string;
 }
 
+export interface PoiInfo {
+  density: number; // 0..1 볼거리·식당 밀도
+  attractionCount?: number; // 반경 내 관광명소 수 (실데이터일 때만)
+  restaurantCount?: number;
+  attractions: string[]; // 대표 장소 이름 (최대 3)
+  restaurants: string[];
+}
+
 export interface Holiday {
   date: string; // YYYY-MM-DD
   name: string;
@@ -86,6 +94,7 @@ export interface Recommendation {
   breakdown: FactorResult[];
   events: TripEvent[];
   penalties: Penalty[];
+  places: { attractions: string[]; restaurants: string[] }; // 실데이터일 때만 채워짐
   dataNotes: string[]; // 추정치/샘플 안내
   links: { label: string; url: string }[];
 }

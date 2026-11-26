@@ -36,6 +36,11 @@ export function createMockProviders(): Providers {
         return { value: eventsFor(dest.id, q.startDate, q.endDate), source: SRC, asOf: now(), estimated: true };
       },
     },
+    poi: {
+      async poi(dest) {
+        return { value: { density: dest.poiDensity, attractions: [], restaurants: [] }, source: SRC, asOf: now(), estimated: true };
+      },
+    },
     holiday: {
       async holidays(q) {
         const value: { date: string; name: string }[] = [];
