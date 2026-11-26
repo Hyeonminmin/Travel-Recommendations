@@ -5,6 +5,8 @@ type Fetch = typeof fetch;
 
 const ENDPOINT = "https://apis.data.go.kr/B551011/KorService2/searchFestival2";
 const MAX_EVENTS = 5; // scoring 이 행사 수에 비례해 가산하므로 상위 몇 개만 사용
+const CACHE_MS = 6 * 3_600_000; // 행사 목록은 하루에 몇 번 바뀌는 정도
+const MAX_PAGES = 3; // 지역당 최대 300건
 const MAX_DURATION_DAYS = 120; // 연중 상설 프로그램(예: 1/1~12/31 상설공연)은 "행사"로 보지 않음
 
 /**
@@ -41,8 +43,13 @@ export function inferTags(title: string): string[] {
 /**
  * 한국관광공사 TourAPI(KorService2 searchFestival2) 행사 Provider. 국내 목적지만 지원하고
  * 해외·호출 실패 시에는 fallback 으로 대체한다. (행사가 0건인 정상 응답은 fallback 하지 않는다)
+ *
+ * 캐시: 지역(lDongRegnCd)별 "오늘(KST) 이후 행사" 원본 목록을 6시간 캐시하고, 여행 기간과의 겹침은 요청마다 로컬에서 거른다.
+ * 그래서 /recommend 한 번에 TourAPI 를 4번 부르던 것이 지역당 6시간에 1~3번으로 줄고, 여행 날짜가 달라도 캐시를 공유한다.
+ * 갱신에 실패하면 오래된 캐시를 계속 쓴다. 지역 행사가 한 번에 받을 수 있는 양(300건)을 넘으면 먼 날짜 행사가 잘릴 수 있어
+ * 그 지역은 캐시를 쓰지 않고 요청별 조회(여행 시작일 기준)로 되돌아가고, 과거 날짜로 시작하는 여행도 캐시를 쓰지 않는다.
  */
-export function createTourApiEvents(serviceKey: string, fallback: EventProvider, fetchFn: Fetch = fetch): EventProvider {
+export function createTourApiEvents(serviceKey: string, fallback: EventProvider, fetchFn: Fetch = fetch, now: () => number = () => Date.now()): EventProvider {
   // data.go.kr 은 Encoding/Decoding 키 두 종류를 주므로 이미 인코딩된 키는 풀어서 URLSearchParams 로 한 번만 인코딩
   const key = serviceKey.includes("%") ? decodeURIComponent(serviceKey) : serviceKey;
 
@@ -65,9 +72,10 @@ export function createTourApiEvents(serviceKey: string, fallback: EventProvider,
     throw lastErr;
   }
 
-  async function fetchRegion(regionCode: string, from: string): Promise<TourItem[]> {
+  async function fetchRegion(regionCode: string, from: string): Promise<{ items: TourItem[]; truncated: boolean }> {
     const out: TourItem[] = [];
-    for (let page = 1; page <= 3; page++) {
+    let total = 0;
+    for (let page = 1; page <= MAX_PAGES; page++) {
       const q = new URLSearchParams({
         serviceKey: key, MobileOS: "ETC", MobileApp: "TravelRec", _type: "json",
         eventStartDate: compact(from), lDongRegnCd: regionCode, numOfRows: "100", pageNo: String(page),
@@ -79,9 +87,43 @@ export function createTourApiEvents(serviceKey: string, fallback: EventProvider,
       const items = body?.items?.item; // 0건이면 items 가 "" 로 온다
       const list: TourItem[] = Array.isArray(items) ? items : items ? [items] : [];
       out.push(...list);
-      if (page * 100 >= Number(body?.totalCount ?? 0)) break;
+      total = Number(body?.totalCount ?? 0);
+      if (page * 100 >= total) break;
     }
-    return out;
+    return { items: out, truncated: total > out.length };
+  }
+
+  interface RegionEntry { at: number; items: TourItem[]; truncated: boolean }
+  const cache = new Map<string, RegionEntry>();
+  const inflight = new Map<string, Promise<RegionEntry>>();
+  const todayKst = () => new Date(now() + 9 * 3_600_000).toISOString().slice(0, 10);
+
+  function loadShared(regionCode: string): Promise<RegionEntry> {
+    const running = inflight.get(regionCode);
+    if (running) return running; // 동시 요청은 호출 한 번을 공유
+    const p = (async () => {
+      const r = await fetchRegion(regionCode, todayKst());
+      const entry = { at: now(), ...r };
+      cache.set(regionCode, entry);
+      return entry;
+    })().finally(() => inflight.delete(regionCode));
+    inflight.set(regionCode, p);
+    return p;
+  }
+
+  /** 지역 행사 원본 목록(+기준 시각). 캐시를 쓸 수 없는 경우(과거 시작·잘림)는 여행 시작일 기준으로 직접 조회한다. */
+  async function regionItems(regionCode: string, tripStart: string): Promise<{ items: TourItem[]; at: number }> {
+    const direct = async () => ({ items: (await fetchRegion(regionCode, tripStart)).items, at: now() });
+    if (tripStart < todayKst()) return direct();
+    const hit = cache.get(regionCode);
+    if (hit && now() - hit.at < CACHE_MS) return hit.truncated ? direct() : hit;
+    try {
+      const entry = await loadShared(regionCode);
+      return entry.truncated ? direct() : entry;
+    } catch (e) {
+      if (hit && !hit.truncated) return hit; // 갱신 실패 시 오래된 캐시라도 사용
+      throw e;
+    }
   }
 
   return {
@@ -90,7 +132,7 @@ export function createTourApiEvents(serviceKey: string, fallback: EventProvider,
       if (!region || !dest.domestic) return fallback.events(dest, q);
       try {
         // eventStartDate 는 "이 날짜 이후에도 진행 중인 행사"까지 포함해 돌려준다
-        const items = await fetchRegion(region.regionCode, q.startDate);
+        const { items, at } = await regionItems(region.regionCode, q.startDate);
         const events: TripEvent[] = [];
         for (const it of items) {
           if (!it.title || !it.eventstartdate || !it.eventenddate) continue;
@@ -103,7 +145,7 @@ export function createTourApiEvents(serviceKey: string, fallback: EventProvider,
         }
         // 짧고 뚜렷한 행사를 우선 (기간이 긴 행사는 뒤로)
         events.sort((a, b) => days(a.startDate, a.endDate) - days(b.startDate, b.endDate));
-        return { value: events.slice(0, MAX_EVENTS), source: "TourAPI(한국관광공사) 행사정보", asOf: new Date().toISOString(), estimated: false };
+        return { value: events.slice(0, MAX_EVENTS), source: "TourAPI(한국관광공사) 행사정보", asOf: new Date(at).toISOString(), estimated: false };
       } catch {
         return fallback.events(dest, q);
       }
