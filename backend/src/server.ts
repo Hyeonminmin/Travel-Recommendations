@@ -41,7 +41,7 @@ export function buildServer(opts: { providers?: Providers; apiToken?: string } =
     if (!parsed.success) return reply.code(400).send({ error: "invalid_request", details: parsed.error.flatten() });
     const q = parsed.data;
     if (q.endDate <= q.startDate) return reply.code(400).send({ error: "endDate must be after startDate" });
-    const [flight, lodgingPrice, lodgingRating, weather, events, holidays, places] = await Promise.all([
+    const [flight, lodgingPrice, lodgingRating, weather, events, holidays, places, hotels] = await Promise.all([
       providers.flight.roundTripPerPersonKRW(dest, q),
       providers.lodging.perNightKRW(dest, q),
       providers.lodging.rating(dest),
@@ -49,9 +49,10 @@ export function buildServer(opts: { providers?: Providers; apiToken?: string } =
       providers.event.events(dest, q),
       providers.holiday.holidays(q),
       providers.place.places(dest),
+      providers.hotelQuote.quotes(dest, q),
     ]);
     const { id, name, country, domestic, tags, lat, lon } = dest;
-    return { destination: { id, name, country, domestic, tags, lat, lon }, flight, lodgingPerNight: lodgingPrice, lodgingRating, weather, events, holidays, places };
+    return { destination: { id, name, country, domestic, tags, lat, lon }, flight, lodgingPerNight: lodgingPrice, lodgingRating, weather, events, holidays, places, hotels };
   });
 
   return app;

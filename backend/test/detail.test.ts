@@ -8,7 +8,7 @@ describe("GET /destination/:id", () => {
     expect(r.statusCode).toBe(200);
     const b = r.json();
     expect(b.destination.id).toBe("jeju");
-    for (const k of ["flight", "lodgingPerNight", "lodgingRating", "weather", "events", "holidays", "places"]) expect(b[k].source).toBeTruthy();
+    for (const k of ["flight", "lodgingPerNight", "lodgingRating", "weather", "events", "holidays", "places", "hotels"]) expect(b[k].source).toBeTruthy();
   });
   it("없는 id 404, 날짜 오류 400, 토큰 필요 시 401", async () => {
     expect((await buildServer().inject({ url: `/destination/nope?${qs}` })).statusCode).toBe(404);

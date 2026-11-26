@@ -34,10 +34,15 @@
 - ASOS 일자료 승인·검증 완료(asos.ts): 관측소 제주184/부산159/강릉105/여수168, 최근3년 평균기온+강수일비율(0.1mm 이상 또는 신적설). 국내 평년값은 ASOS → Open-Meteo → Mock 순, 예보가 덮는 날은 기상청 예보 우선.
 - 과거 날씨는 Open-Meteo archive(최근 3년 같은 기간)로 이미 반영. 오늘 공용 IP 일일한도(429)라 실검증 못함 → 한도 해소 후 확인. 대안: 기상청 ASOS 일자료(활용신청 필요).
 
+- 숙소 가격 조사: Travelpayouts Hotellook 은 2025-10-20 종료(사용 불가). 결정한 구성:
+  (A) 국내 점수용 1박 요금 = TourAPI 숙박 등록 객실 최저요금(주중) 중앙값(tourApiLodging.ts, 실응답 확인: 부산 비수기 18만/성수기 30만, 제주 19.8만). 등록률 낮고 최저요금이라 estimated=true, 표본<5 이면 샘플값. 24h 캐시, 첫 수집이 느려(최대 ~1분) 6초 넘으면 이번 요청은 샘플값 + 서버 시작 시 prewarm.
+  (B) 상세 화면 실시간 시세 = SerpApi Google Hotels(serpHotels.ts, 유료·무료 월 250회). **키 미발급 → 실응답 미검증**(필드: properties[].rate_per_night.extracted_lowest, overall_rating, link). 환경변수 SERPAPI_KEY + 호스트 serpapi.com 허용 필요. 상세(/destination/:id)의 `hotels` 로만 노출, 점수·순위 미반영, (목적지·날짜·인원) 24h 캐시.
+- 실시간 크롤링은 약관/차단/유지보수 이유로 채택하지 않음(링크 연결로 대체).
+
 ## 다음 작업 (1번은 완료: 단, 네트워크 허용 후 재실행 필요)
 1. `cd backend && npm install && npm run verify:apis` 를 NODE_USE_ENV_PROXY=1 NODE_EXTRA_CA_CERTS=/root/.ccr/ca-bundle.crt 와 함께 실행해 OK/FAIL 확인
    - TourAPI 서비스 버전(KorService2/1)과 필드 구조는 실제 응답으로 확정할 것
 2. (TourAPI 행사/특일/기상청 단기·중기예보 완료)
 3. (Kakao 장소·상세 API 완료) poiDensity 를 Kakao 결과 수 등 실데이터로 대체할지 검토, Android 상세 화면 연동
-4. 숙소 가격 소스 검토(Travelpayouts Hotellook 가능 여부)
+4. SerpApi 키 발급 후 serpHotels.ts 실응답 검증(호스트 허용 + SERPAPI_KEY)
 5. 각 Provider 는 실패 시 Mock fallback 유지, 단위 테스트(가짜 fetch) 추가

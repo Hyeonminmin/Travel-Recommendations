@@ -29,6 +29,11 @@ export interface Place { name: string; category: string; address: string; url: s
 export interface PlaceProvider {
   places(dest: Destination): Promise<Sourced<{ restaurants: Place[]; attractions: Place[] }>>;
 }
+export interface HotelQuote { name: string; perNightKRW: number; rating?: number; url?: string }
+export interface HotelQuoteProvider {
+  /** 실시간 숙소 시세(유료 API). 호출 비용이 있어 결과 상세에서만 사용한다. */
+  quotes(dest: Destination, q: TripQuery): Promise<Sourced<{ medianPerNightKRW: number; hotels: HotelQuote[] }>>;
+}
 export interface Providers {
   flight: FlightProvider;
   lodging: LodgingProvider;
@@ -36,4 +41,5 @@ export interface Providers {
   event: EventProvider;
   holiday: HolidayProvider;
   place: PlaceProvider;
+  hotelQuote: HotelQuoteProvider;
 }

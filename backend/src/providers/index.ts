@@ -3,7 +3,9 @@ import { createOpenMeteoWeather } from "./openMeteo.js";
 import { createAsosClimatology } from "./asos.js";
 import { createKmaWeather } from "./kma.js";
 import { createKakaoPlaces } from "./kakaoPlaces.js";
+import { createSerpHotels } from "./serpHotels.js";
 import { createSpecialDayHolidays } from "./holidays.js";
+import { createTourApiLodging } from "./tourApiLodging.js";
 import { createTourApiEvents } from "./tourApi.js";
 import { createTravelpayoutsFlight } from "./travelpayouts.js";
 import type { Providers } from "./types.js";
@@ -28,12 +30,18 @@ export function createProviders(env: NodeJS.ProcessEnv = process.env): { provide
     providers.weather = createAsosClimatology(env.DATA_GO_KR_SERVICE_KEY, providers.weather);
     providers.weather = createKmaWeather(env.DATA_GO_KR_SERVICE_KEY, providers.weather);
     live.push("weather(기상청 단기·중기예보 + ASOS 평년값, 국내)");
+    providers.lodging = createTourApiLodging(env.DATA_GO_KR_SERVICE_KEY, mock.lodging);
+    live.push("lodging(TourAPI 등록요금 추정, 국내·가격만)");
     providers.holiday = createSpecialDayHolidays(env.DATA_GO_KR_SERVICE_KEY, mock.holiday);
     live.push("holiday(특일)");
   }
   if (env.KAKAO_REST_API_KEY) {
     providers.place = createKakaoPlaces(env.KAKAO_REST_API_KEY, mock.place);
     live.push("place(Kakao, 국내만)");
+  }
+  if (env.SERPAPI_KEY) {
+    providers.hotelQuote = createSerpHotels(env.SERPAPI_KEY, mock.hotelQuote);
+    live.push("hotelQuote(SerpApi, 상세 전용·캐시)");
   }
   return { providers, live };
 }

@@ -47,5 +47,10 @@ export function createMockProviders(): Providers {
         return { value: { restaurants: [], attractions: [] }, source: `${SRC}(장소 데이터 없음)`, asOf: now(), estimated: true };
       },
     },
+    hotelQuote: {
+      async quotes(dest) {
+        return { value: { medianPerNightKRW: dest.lodgingPerNightKRW, hotels: [] }, source: `${SRC}(실시간 시세 없음)`, asOf: now(), estimated: true };
+      },
+    },
   };
 }
