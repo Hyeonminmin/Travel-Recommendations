@@ -5,6 +5,8 @@ type Fetch = typeof fetch;
 
 const BASE = "https://apis.data.go.kr/1360000/MidFcstInfoService";
 const ISSUE_HOURS = [6, 18]; // 중기예보 발표 시각(KST)
+const MID_FIRST_DAY = 4; // 발표일 기준 4일 후부터(18시 발표분은 5일 후부터)
+const MID_LAST_DAY = 10;
 
 /**
  * 목적지 → 중기예보 지역코드. 기온은 도시 코드(getMidTa), 육상예보(강수확률)는 광역 코드(getMidLandFcst)를 쓴다.
@@ -97,6 +99,9 @@ export function createKmaMidWeather(serviceKey: string, fallback: WeatherProvide
       if (!region || !dest.domestic) return fallback.forecast(dest, q);
       try {
         const now = today();
+        // 발표일 기준 4~10일 후 필드만 존재한다. 범위 밖이면 API 를 호출하지 않고 바로 fallback(불필요한 호출·지연 방지)
+        const base = issuanceCandidates(now)[0].slice(0, 8);
+        if (daysBetween(base, q.startDate) < MID_FIRST_DAY || daysBetween(base, q.endDate) > MID_LAST_DAY) return fallback.forecast(dest, q);
         const dates = eachDate(q.startDate, q.endDate);
         let lastNoData = false;
         for (const tmFc of issuanceCandidates(now)) {

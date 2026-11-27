@@ -106,4 +106,17 @@ describe("기상청 중기예보 Provider", () => {
     await createKmaMidWeather("a%2Bb%3D", mock, f, today).forecast(dest("busan"), q("2026-11-30", "2026-11-30"));
     expect(urls[0]).toContain("serviceKey=a%2Bb%3D");
   });
+  it("발표일 기준 4~10일 범위 밖이면 API 를 호출하지 않고 바로 fallback", async () => {
+    for (const [s, e] of [["2026-11-28", "2026-11-29"], ["2026-11-27", "2026-12-01"], ["2026-12-05", "2026-12-07"], ["2026-12-24", "2026-12-27"]]) {
+      const calls: Call[] = [];
+      const r = await createKmaMidWeather("k", mock, fake(normal, calls), today).forecast(dest("busan"), q(s, e));
+      expect(r.source).toContain("mock");
+      expect(calls).toHaveLength(0);
+    }
+    // 경계(발표일 11/26 기준 +4 ~ +10 = 11/30 ~ 12/06)는 호출한다
+    const calls: Call[] = [];
+    await createKmaMidWeather("k", mock, fake(normal, calls), today).forecast(dest("busan"), q("2026-11-30", "2026-11-30"));
+    expect(calls.length).toBe(2);
+  });
 });
+
