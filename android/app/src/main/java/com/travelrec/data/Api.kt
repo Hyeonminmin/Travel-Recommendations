@@ -7,6 +7,7 @@ import okhttp3.Interceptor
 import okhttp3.MediaType.Companion.toMediaType
 import okhttp3.OkHttpClient
 import okhttp3.logging.HttpLoggingInterceptor
+import java.util.concurrent.TimeUnit
 import retrofit2.Retrofit
 import retrofit2.http.Body
 import retrofit2.http.POST
@@ -27,6 +28,9 @@ object ApiProvider {
 
     val api: TravelApi by lazy {
         val client = OkHttpClient.Builder()
+            // 서버 캐시가 비어 있는 첫 요청은 외부 API 를 여러 개 부르느라 10초(OkHttp 기본)를 넘길 수 있다
+            .connectTimeout(10, TimeUnit.SECONDS)
+            .readTimeout(30, TimeUnit.SECONDS)
             .addInterceptor(Interceptor { chain ->
                 chain.proceed(chain.request().newBuilder().header("Authorization", "Bearer ${BuildConfig.API_TOKEN}").build())
             })
