@@ -52,6 +52,7 @@ fun RecommendScreen(vm: RecommendViewModel, listState: LazyListState = rememberL
             }
         }
         item { WeightSliders(s.weights) { w -> vm.update { copy(weights = w) } } }
+        item { ServerSettings(s.serverUrl, s.serverMessage, onChange = { v -> vm.update { copy(serverUrl = v, serverMessage = null) } }, onSave = vm::saveServerUrl) }
         item {
             Button(onClick = vm::search, enabled = !s.loading, modifier = Modifier.fillMaxWidth()) {
                 if (s.loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp) else Text("추천 받기")
@@ -70,6 +71,20 @@ fun RecommendScreen(vm: RecommendViewModel, listState: LazyListState = rememberL
             }
         }
         item { Spacer(Modifier.height(24.dp)) }
+    }
+}
+
+/** 서버 주소 설정. 폰에서는 PC/서버의 주소를 직접 입력해야 한다(에뮬레이터 기본값 10.0.2.2 는 폰에서 쓸 수 없다). */
+@Composable
+private fun ServerSettings(url: String, message: String?, onChange: (String) -> Unit, onSave: () -> Unit) {
+    var open by remember { mutableStateOf(false) }
+    TextButton(onClick = { open = !open }) { Text(if (open) "서버 설정 닫기" else "서버 설정 (현재: ${url.removePrefix("http://").removePrefix("https://").trimEnd('/')})") }
+    if (!open) return
+    Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
+        OutlinedTextField(url, onChange, label = { Text("서버 주소") }, modifier = Modifier.fillMaxWidth(), singleLine = true)
+        Text("예: http://192.168.0.10:8080/ (같은 Wi-Fi의 PC), http://localhost:8080/ (이 폰에서 서버 실행)", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
+        Button(onClick = onSave) { Text("저장") }
+        message?.let { Text(it, style = MaterialTheme.typography.labelSmall) }
     }
 }
 

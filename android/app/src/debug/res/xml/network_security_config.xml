@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- 디버그 빌드 전용: 폰에서 같은 Wi-Fi 의 PC(임의의 사설 IP)로 접속할 수 있도록 HTTP 를 허용한다.
+     릴리스 빌드는 main 의 설정(10.0.2.2/localhost 만 HTTP 허용)을 그대로 쓴다. -->
+<network-security-config>
+    <base-config cleartextTrafficPermitted="true" />
+</network-security-config>

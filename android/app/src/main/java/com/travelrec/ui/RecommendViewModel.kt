@@ -38,13 +38,31 @@ data class UiState(
     /** 현재 목록을 만든 요청. 상세 호출에 그대로 보내야 점수·가중치가 목록과 일치한다(입력창을 고쳐도 변하지 않음). */
     val lastRequest: RecommendRequest? = null,
     val detail: DetailState? = null,
+    /** 서버 주소 입력창 값과 검증 오류. 저장 전에는 ApiProvider 에 적용되지 않는다. */
+    val serverUrl: String = "",
+    val serverMessage: String? = null,
 )
 
 class RecommendViewModel : ViewModel() {
-    private val _state = MutableStateFlow(UiState())
+    private val _state = MutableStateFlow(UiState(serverUrl = ApiProvider.currentBaseUrl))
+
+    /** 서버 주소를 저장했을 때 영구 저장소에 기록하기 위한 훅(Activity 가 SharedPreferences 로 연결). */
+    var onServerUrlSaved: ((String) -> Unit)? = null
     val state: StateFlow<UiState> = _state.asStateFlow()
 
     fun update(block: UiState.() -> UiState) = _state.update(block)
+
+    /** 입력한 서버 주소를 검증해 적용하고 저장한다. 목록·상세 결과는 이전 서버 기준이라 비운다. */
+    fun saveServerUrl() {
+        val applied = ApiProvider.setBaseUrl(_state.value.serverUrl)
+        if (applied == null) {
+            _state.update { it.copy(serverMessage = "올바른 주소가 아닙니다. 예: http://192.168.0.10:8080/") }
+            return
+        }
+        onServerUrlSaved?.invoke(applied)
+        detailJob?.cancel()
+        _state.update { it.copy(serverUrl = applied, serverMessage = "저장했습니다: $applied", response = null, lastRequest = null, detail = null, error = null) }
+    }
 
     fun toggleTag(tag: String) = _state.update { it.copy(tags = if (tag in it.tags) it.tags - tag else it.tags + tag) }
 
