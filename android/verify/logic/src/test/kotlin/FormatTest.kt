@@ -31,4 +31,13 @@ class FormatTest {
         val m = linkedMapOf("poi" to 1, "zzz" to 2, "flight" to 3, "weather" to 4, "lodging" to 5)
         assertEquals(listOf("flight", "lodging", "weather", "poi", "zzz"), orderedSources(m).map { it.first })
     }
+
+    @Test fun transportIsLabelledByDestinationType() {
+        assertEquals("교통", transportLabel(true))
+        assertEquals("항공", transportLabel(false))
+        assertEquals("국내 교통", sourceLabel("flight", domestic = true))
+        assertEquals("항공권", sourceLabel("flight", domestic = false))
+        assertEquals("항공권", sourceLabel("flight")) // 기본값은 해외
+        assertEquals("행사", sourceLabel("event", domestic = true)) // 다른 항목은 영향 없음
+    }
 }

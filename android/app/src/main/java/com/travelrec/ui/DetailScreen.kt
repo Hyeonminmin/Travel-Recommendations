@@ -71,7 +71,7 @@ private fun DetailContent(d: DestinationDetail) {
                 )
             }
         }
-        item { SectionCard("비용 내역") { CostSection(d.cost, d.trip) } }
+        item { SectionCard("비용 내역") { CostSection(d.cost, d.trip, d.destination.domestic, d.sources["flight"]?.estimated == true) } }
         item { SectionCard("날씨") { WeatherSection(d.weather, d.sources["weather"]) } }
         if (r.penalties.isNotEmpty() || d.holidays.isNotEmpty()) {
             item { SectionCard("공휴일·혼잡") { HolidaySection(d.holidays, r.penalties) } }
@@ -81,7 +81,7 @@ private fun DetailContent(d: DestinationDetail) {
             item { SectionCard("볼거리·식당") { PlacesSection(d.places) } }
         }
         item { SectionCard("점수 근거") { BreakdownSection(r.breakdown) } }
-        item { SectionCard("데이터 출처") { SourcesSection(d.sources) } }
+        item { SectionCard("데이터 출처") { SourcesSection(d.sources, d.destination.domestic) } }
         if (r.dataNotes.isNotEmpty()) {
             item {
                 Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
@@ -145,14 +145,17 @@ private fun LabelValue(label: String, value: String, bold: Boolean = false) {
 private fun Caption(text: String) = Text(text, style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.outline)
 
 @Composable
-private fun CostSection(c: CostBreakdown, t: TripInfo) {
-    LabelValue("항공(1인 ${krw(c.flightPerPersonKRW)} × ${t.travelers}명)", krw(c.flightTotalKRW))
+private fun CostSection(c: CostBreakdown, t: TripInfo, domestic: Boolean, transportEstimated: Boolean) {
+    LabelValue("${transportLabel(domestic)}(왕복 1인 ${krw(c.flightPerPersonKRW)} × ${t.travelers}명)", krw(c.flightTotalKRW))
     LabelValue("숙소(1박 ${krw(c.lodgingPerNightKRW)} × ${t.nights}박 × ${t.rooms}실)", krw(c.lodgingTotalKRW))
     LabelValue("현지 지출", krw(c.localSpendKRW))
     HorizontalDivider()
     LabelValue("합계", krw(c.totalKRW), bold = true)
     val ratio = if (t.budgetKRW > 0) (c.totalKRW * 100.0 / t.budgetKRW).toInt() else 0
     Caption("예산 ${krw(t.budgetKRW)}의 ${ratio}%")
+    if (transportEstimated) {
+        Caption(if (domestic) "교통비는 KTX·버스·국내선 등을 뭉뚱그린 샘플 추정치입니다(실제 요금 아님)." else "항공권 가격은 추정치입니다.")
+    }
 }
 
 @Composable
@@ -209,14 +212,14 @@ private fun BreakdownSection(factors: List<FactorResult>) {
 }
 
 @Composable
-private fun SourcesSection(sources: Map<String, SourceMeta>) {
+private fun SourcesSection(sources: Map<String, SourceMeta>, domestic: Boolean) {
     if (sources.isEmpty()) {
         Text("출처 정보 없음", style = MaterialTheme.typography.bodyMedium)
         return
     }
     orderedSources(sources).forEach { (key, m) ->
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp), verticalAlignment = Alignment.CenterVertically) {
-            Text(sourceLabel(key), style = MaterialTheme.typography.labelLarge)
+            Text(sourceLabel(key, domestic), style = MaterialTheme.typography.labelLarge)
             if (m.estimated) Text("추정", style = MaterialTheme.typography.labelSmall, color = MaterialTheme.colorScheme.error)
         }
         Caption("${m.source} · ${formatAsOf(m.asOf)} 기준")

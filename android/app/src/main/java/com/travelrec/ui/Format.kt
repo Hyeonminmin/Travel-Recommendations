@@ -20,9 +20,13 @@ fun factorLabel(k: String) = when (k) {
     "cost" -> "가격"; "weather" -> "날씨"; "event" -> "축제"; "lodging" -> "숙소"; "poi" -> "볼거리"; "logistics" -> "이동"; else -> k
 }
 
+/** 국내는 KTX·버스·국내선 등을 뭉뚱그린 "교통", 해외는 "항공". (API 필드명은 flight* 지만 화면에는 목적지에 맞게 표시한다) */
+fun transportLabel(domestic: Boolean) = if (domestic) "교통" else "항공"
+
 /** 서버 sources 맵의 키 → 화면 표시 이름. 모르는 키는 그대로 보여 준다. */
-fun sourceLabel(k: String) = when (k) {
-    "flight" -> "항공권"; "lodging" -> "숙소 1박 요금"; "lodgingRating" -> "숙소 평점"; "weather" -> "날씨"
+fun sourceLabel(k: String, domestic: Boolean = false) = when (k) {
+    "flight" -> if (domestic) "국내 교통" else "항공권"
+    "lodging" -> "숙소 1박 요금"; "lodgingRating" -> "숙소 평점"; "weather" -> "날씨"
     "event" -> "행사"; "holiday" -> "공휴일"; "poi" -> "볼거리·식당"; else -> k
 }
 
