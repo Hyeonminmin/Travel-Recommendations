@@ -9,7 +9,8 @@
     "start": "node dist/index.js",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
-    "verify:apis": "tsx --env-file=.env scripts/verify-apis.ts"
+    "verify:apis": "tsx --env-file=.env scripts/verify-apis.ts",
+    "bundle": "esbuild src/index.ts --bundle --platform=node --target=node20 --format=cjs --minify --outfile=dist/travel-backend.cjs"
   },
   "dependencies": {
     "fastify": "^5.0.0",
@@ -17,6 +18,7 @@
   },
   "devDependencies": {
     "@types/node": "^22.0.0",
+    "esbuild": "^0.28.2",
     "tsx": "^4.19.0",
     "typescript": "^5.6.0",
     "vitest": "^2.1.0"
